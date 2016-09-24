@@ -37,6 +37,16 @@ public class MainActivity extends AppCompatActivity {
         }
         danmakuView.setShowDebugInfo(true);
         danmakuView.setDanmakuSource(ds);
+        danmakuView.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if(danmakuView.isShow()){
+                    danmakuView.hide();
+                }else {
+                    danmakuView.show();
+                }
+            }
+        });
         btnPlay.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
