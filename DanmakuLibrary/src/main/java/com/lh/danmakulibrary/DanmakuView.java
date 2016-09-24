@@ -35,8 +35,8 @@ public class DanmakuView extends View {
     private long mScrollDanmakuShowTime = 9000; //滚动弹幕显示时长
 
     private float mStrokeWidth = 0.8f; //文本描边宽度
-    private float mPeerTrackHeight;
-    private int mTrackMargin;
+    private int mPeerTrackHeight;
+    private float mTrackMargin;
     private int mMaxDanmakuCount = 50;
     private int mCuurentDanmakuCount = 0;
 
@@ -102,7 +102,6 @@ public class DanmakuView extends View {
         mDebugTextPaint.setColor(Color.WHITE);
 
         mPeerTrackHeight = dip2px(18 * mScaleTextRatio);
-        mTrackMargin = dip2px(1 * mScaleTextRatio);
 
         mDanmakuTracks = new ArrayList<>();
         for (int i = 0; i < mDanmakuTrackCount; i++) {
@@ -222,15 +221,20 @@ public class DanmakuView extends View {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
         mScreenHeight = getMeasuredHeight();
         mScreenWidth = getMeasuredWidth();
-        int currentY = mTrackMargin;
-        for (int i = 0; i < mDanmakuTracks.size(); i++) {
+        int trackTotalHeight = 0;
+        int currentTrackCount = 0;
+        while (trackTotalHeight + mPeerTrackHeight < mScreenHeight && currentTrackCount < mDanmakuTrackCount) {
+            trackTotalHeight += mPeerTrackHeight;
+            currentTrackCount++;
+        }
+        mDanmakuTrackCount = currentTrackCount;
+        mTrackMargin = (mScreenHeight - trackTotalHeight) / (mDanmakuTrackCount * 2.0f);
+        float currentY = 0;
+        for (int i = 0; i < mDanmakuTrackCount; i++) {
             DanmakuTrack track = mDanmakuTracks.get(i);
+            currentY += mTrackMargin;
             track.y = currentY;
             currentY += (mPeerTrackHeight + mTrackMargin);
-            if (currentY > mScreenHeight) {
-                mDanmakuTracks.remove(track);
-                i--;
-            }
         }
     }
 
@@ -437,7 +441,7 @@ public class DanmakuView extends View {
     private class DanmakuTrack {
         LinkedList<DanmakuWrapped> mDanmakus;
         DanmakuWrapped mWaitToAddDanamku; //等待加入轨道的弹幕
-        int y;
+        float y;
 
         boolean haveCenterDanmaku;
         DanmakuWrapped lastScrollDanmaku;
@@ -495,7 +499,7 @@ public class DanmakuView extends View {
             speed = mSpeedRatio * (mScreenWidth + getWidth()) * 16.7f / mScrollDanmakuShowTime;
         }
 
-        private void draw(Canvas canvas, int y) {
+        private void draw(Canvas canvas, float y) {
             canvas.drawText(danmaku.getContent(), x, y + getHeight(), paint);
             canvas.drawText(danmaku.getContent(), x, y + getHeight(), strokePaint);
         }
