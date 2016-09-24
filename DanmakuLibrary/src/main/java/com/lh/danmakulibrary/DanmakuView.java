@@ -30,7 +30,7 @@ public class DanmakuView extends View {
     private float mDensity;
     private float mScaleTextRatio = 1.2f; //文本缩放倍率
     private float mSpeedRatio = 1.2f; //速度倍率
-    private int mDanmakuTrackCount = 15; //显示弹幕的轨道数
+    private int mDanmakuTrackCount = 20; //显示弹幕的轨道数(最大)
     private long mCenterDanmakuShowTime = 5000; //居中弹幕的显示时长
     private long mScrollDanmakuShowTime = 9000; //滚动弹幕显示时长
 
@@ -230,11 +230,15 @@ public class DanmakuView extends View {
         mDanmakuTrackCount = currentTrackCount;
         mTrackMargin = (mScreenHeight - trackTotalHeight) / (mDanmakuTrackCount * 2.0f);
         float currentY = 0;
-        for (int i = 0; i < mDanmakuTrackCount; i++) {
-            DanmakuTrack track = mDanmakuTracks.get(i);
-            currentY += mTrackMargin;
-            track.y = currentY;
-            currentY += (mPeerTrackHeight + mTrackMargin);
+        for (int i = 0; i < mDanmakuTracks.size(); i++) {
+            if (i < mDanmakuTrackCount) {
+                DanmakuTrack track = mDanmakuTracks.get(i);
+                currentY += mTrackMargin;
+                track.y = currentY;
+                currentY += (mPeerTrackHeight + mTrackMargin);
+            } else {
+                mDanmakuTracks.remove(i);
+            }
         }
     }
 
