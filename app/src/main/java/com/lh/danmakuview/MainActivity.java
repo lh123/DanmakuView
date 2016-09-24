@@ -1,7 +1,7 @@
 package com.lh.danmakuview;
 
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.SeekBar;
@@ -16,8 +16,9 @@ public class MainActivity extends AppCompatActivity {
 
     private ArrayList<Danmaku> ds;
     private DanmakuView danmakuView;
-    private Button btnPlay,btnPause,btnResume,btnStop;
+    private Button btnPlay, btnPause, btnResume, btnStop;
     private SeekBar seekBar;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -60,7 +61,7 @@ public class MainActivity extends AppCompatActivity {
                 danmakuView.stop();
             }
         });
-        seekBar.setMax((int) ds.get(ds.size()-1).getTime());
+        seekBar.setMax((int) ds.get(ds.size() - 1).getTime());
         seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
@@ -77,5 +78,29 @@ public class MainActivity extends AppCompatActivity {
                 danmakuView.seekTo(seekBar.getProgress());
             }
         });
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (danmakuView.isPrepared()) {
+            danmakuView.pause();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (danmakuView.isPrepared()) {
+            danmakuView.resume();
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (danmakuView.isPrepared()) {
+            danmakuView.stop();
+        }
     }
 }
