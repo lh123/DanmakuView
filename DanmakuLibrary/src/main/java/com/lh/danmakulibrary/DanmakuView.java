@@ -383,7 +383,7 @@ public class DanmakuView extends View {
 
     private void refreshSingleTrackDanmaku(DanmakuTrack track) {
         ListIterator<DanmakuWrapped> iterator = track.getFirstIterator();
-        while (iterator != null && iterator.hasNext()) {
+        while (iterator.hasNext()) {
             DanmakuWrapped danmaku = iterator.next();
             if (danmaku.danmaku.getType() == 1) {
                 if (danmaku.x + danmaku.getWidth() < 0) {
@@ -501,7 +501,7 @@ public class DanmakuView extends View {
                 mWaitToAddDanamku = null;
             }
             ListIterator<DanmakuWrapped> listIterator = getFirstIterator();
-            while (listIterator != null && listIterator.hasNext()) {
+            while (listIterator.hasNext()) {
                 listIterator.next().draw(canvas, y);
             }
         }
@@ -523,14 +523,18 @@ public class DanmakuView extends View {
                     mDanmakusIterator.next();
                 }
             } else {
-                mDanmakusIterator = mDanmakus.listIterator();
+                int size = mDanmakus.size();
+                mDanmakusIterator = mDanmakus.listIterator(size > 0 ? size - 1 : 0);
             }
             return mDanmakusIterator;
         }
 
         private void clear() {
-            mDanmakus.clear();
-            mDanmakusIterator = mDanmakus.listIterator();
+            ListIterator<DanmakuWrapped> iterator = getFirstIterator();
+            while (iterator.hasNext()) {
+                iterator.next();
+                iterator.remove();
+            }
             mWaitToAddDanamku = null;
             haveCenterDanmaku = false;
         }
