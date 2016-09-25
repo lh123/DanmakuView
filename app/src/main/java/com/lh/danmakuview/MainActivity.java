@@ -35,8 +35,13 @@ public class MainActivity extends AppCompatActivity {
         } catch (Exception e) {
             e.printStackTrace();
         }
-        danmakuView.setShowDebugInfo(true);
-        danmakuView.setDanmakuSource(ds);
+//        danmakuView.setShowDebugInfo(true);
+        danmakuView.post(new Runnable() {
+            @Override
+            public void run() {
+                danmakuView.setDanmakuSource(ds);
+            }
+        });
         danmakuView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
