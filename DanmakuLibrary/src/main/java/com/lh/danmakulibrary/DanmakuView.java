@@ -22,6 +22,11 @@ import java.util.TimerTask;
 @SuppressWarnings({"FieldCanBeLocal", "unused"})
 public class DanmakuView extends View {
 
+    public static final int IDLE = 0;
+    public static final int PREPARED = 1;
+    public static final int PLAYING = 2;
+    public static final int PAUSE = 3;
+
     private static final long REFRESH_TIME = 100;
     private static final int MAX_TEXT_SIZE = 21;
 
@@ -60,7 +65,7 @@ public class DanmakuView extends View {
     private LinkedList<DanmakuWrapped> mScrapDanmakus; //弹幕回收池
     private ArrayList<DanmakuTrack> mDanmakuTracks; //弹幕轨道数组
 
-    private DanmakuState mDanmakuState;
+    private int mDanmakuState;
 
     private long mCurrentTime = -1;
     private long mStartTime = -1;
@@ -88,7 +93,7 @@ public class DanmakuView extends View {
         mShowDebugInfo = false;
 
         mShowDanmaku = true;
-        mDanmakuState = DanmakuState.IDLE;
+        mDanmakuState = IDLE;
         mDensity = getResources().getDisplayMetrics().density;
 
         mDebugTextPaint = new TextPaint();
@@ -110,8 +115,8 @@ public class DanmakuView extends View {
     }
 
     public void start() {
-        if (mDanmakuState == DanmakuState.Prepared) {
-            mDanmakuState = DanmakuState.Playing;
+        if (mDanmakuState == PREPARED) {
+            mDanmakuState = PLAYING;
             mTimer = new Timer();
             mTask = new DanmakuTimerTask();
             mTimer.scheduleAtFixedRate(mTask, 0, REFRESH_TIME);
@@ -120,8 +125,8 @@ public class DanmakuView extends View {
     }
 
     public void pause() {
-        if (mDanmakuState == DanmakuState.Playing && mTimer != null && mTask != null) {
-            mDanmakuState = DanmakuState.Pause;
+        if (mDanmakuState == PLAYING && mTimer != null && mTask != null) {
+            mDanmakuState = PAUSE;
             mTimer.cancel();
             mTask.cancel();
             mTimer = null;
@@ -130,8 +135,8 @@ public class DanmakuView extends View {
     }
 
     public void resume() {
-        if (mDanmakuState == DanmakuState.Pause) {
-            mDanmakuState = DanmakuState.Playing;
+        if (mDanmakuState == PAUSE) {
+            mDanmakuState = PLAYING;
             mTimer = new Timer();
             mTask = new DanmakuTimerTask();
             mTimer.scheduleAtFixedRate(mTask, 0, REFRESH_TIME);
@@ -140,7 +145,7 @@ public class DanmakuView extends View {
     }
 
     public void seekTo(long time) {
-        if (mDanmakuState != DanmakuState.IDLE) {
+        if (mDanmakuState != IDLE) {
             mCurrentTime = time;
             for (int i = 0; i < mDanmakus.size(); i++) {
                 Danmaku danmaku = mDanmakus.get(i);
@@ -155,7 +160,7 @@ public class DanmakuView extends View {
     }
 
     public void stop() {
-        mDanmakuState = DanmakuState.IDLE;
+        mDanmakuState = IDLE;
         if (mTimer != null) {
             mTimer.cancel();
         }
@@ -195,11 +200,11 @@ public class DanmakuView extends View {
     }
 
     public boolean isPrepared() {
-        return mDanmakuState != DanmakuState.IDLE;
+        return mDanmakuState != IDLE;
     }
 
     public boolean isPaused() {
-        return mDanmakuState == DanmakuState.Pause;
+        return mDanmakuState == PAUSE;
     }
 
     public long getCurrentTime() {
@@ -215,8 +220,8 @@ public class DanmakuView extends View {
 
     //准备弹幕轨道
     private void prepareDanmakuTrack() {
-        if (mDanmakuState == DanmakuState.IDLE) {
-            mDanmakuState = DanmakuState.Prepared;
+        if (mDanmakuState == IDLE) {
+            mDanmakuState = PREPARED;
             TextPaint measureTextPaint = new TextPaint();
             measureTextPaint.setAntiAlias(true);
             measureTextPaint.setFakeBoldText(true);
@@ -242,7 +247,7 @@ public class DanmakuView extends View {
 
     //添加一条弹幕数据
     public void addDanamku(Danmaku danmaku) {
-        if (mCurrentDanmakuCount >= mMaxDanmakuCount || mDanmakuState == DanmakuState.IDLE) {
+        if (mCurrentDanmakuCount >= mMaxDanmakuCount || mDanmakuState == IDLE) {
             return;
         }
         if (danmaku.getType() == 1) { //滚动弹幕
@@ -376,7 +381,7 @@ public class DanmakuView extends View {
         for (int i = 0; i < mDanmakuTracks.size(); i++) {
             refreshSingleTrackDanmaku(mDanmakuTracks.get(i));
         }
-        if (mDanmakuState == DanmakuState.Playing) {
+        if (mDanmakuState == PLAYING) {
             postInvalidate();
         }
     }
@@ -411,18 +416,11 @@ public class DanmakuView extends View {
         return (int) (dpValue * mDensity + 0.5f);
     }
 
-    private enum DanmakuState {
-        IDLE,
-        Prepared,
-        Playing,
-        Pause,
-    }
-
     private class DanmakuTimerTask extends TimerTask {
 
         @Override
         public void run() {
-            if (mDanmakuState == DanmakuState.Playing) {
+            if (mDanmakuState == PLAYING) {
                 if (mStartTime == -1) {
                     mStartTime = System.currentTimeMillis();
                 }
