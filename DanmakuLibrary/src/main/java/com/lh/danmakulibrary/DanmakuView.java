@@ -23,28 +23,30 @@ import java.util.TimerTask;
 public class DanmakuView extends View {
 
     private static final long REFRESH_TIME = 100;
+    private static final int MAX_TRACK_HEIGHT = 20;
 
     private int mScreenHeight;
     private int mScreenWidth;
 
     private float mDensity;
-    private float mScaleTextRatio = 1.2f; //文本缩放倍率
+    private float mScaleTextRatio = 0.8f; //文本缩放倍率
     private float mSpeedRatio = 1.2f; //速度倍率
-    private int mDanmakuTrackCount = 20; //显示弹幕的轨道数(最大)
+    private int mMaxDanmakuTrackCount = 20; //显示弹幕的轨道数(最大)
     private long mCenterDanmakuShowTime = 5000; //居中弹幕的显示时长
     private long mScrollDanmakuShowTime = 9000; //滚动弹幕显示时长
 
     private float mStrokeWidth = 0.8f; //文本描边宽度
-    private int mPeerTrackHeight;
-    private float mTrackMargin;
-    private int mMaxDanmakuCount = 50;
-    private int mCuurentDanmakuCount = 0;
+    private float mPeerTrackHeight; //每条轨道的高度
+    private float mTrackMargin; //每条轨道的间距
+    private int mMaxDanmakuCount = 50; //最大同时显示的弹幕数量
+    private int mCurrentDanmakuCount = 0; //当前同屏的弹幕数量
 
     private boolean mShowDebugInfo; //是否显示Debug信息
 
-    private boolean mShowDanmaku;
+    private boolean mShowDanmaku; //是否显示弹幕
 
     private TextPaint mDebugTextPaint;
+    private int mDebugTextSize;
     private int mFps;
     private int mFrame;
     private long mDebugStartTime = 0;
@@ -53,7 +55,7 @@ public class DanmakuView extends View {
     private Timer mTimer;
     private DanmakuTimerTask mTask;
 
-    private ArrayList<Danmaku> mDanmakus;
+    private ArrayList<Danmaku> mDanmakus; //弹幕数据源
 
     private LinkedList<DanmakuWrapped> mScrapDanmakus = new LinkedList<>(); //弹幕回收池
     private ArrayList<DanmakuTrack> mDanmakuTracks; //弹幕轨道数组
@@ -63,20 +65,13 @@ public class DanmakuView extends View {
     private long mCurrentTime = -1;
     private long mStartTime = -1;
 
-    private int mLastAddDanmakuIndex;
-
-    private enum DanmakuState {
-        IDLE,
-        Prepared,
-        Playing,
-        Pause,
-    }
-
+    private int mLastAddDanmakuIndex; //最后出现的弹幕的索引
 
     public DanmakuView(Context context) {
         super(context);
         init();
     }
+
 
     public DanmakuView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -88,7 +83,6 @@ public class DanmakuView extends View {
         init();
     }
 
-
     //初始化
     private void init() {
         mShowDebugInfo = false;
@@ -98,15 +92,11 @@ public class DanmakuView extends View {
         mDensity = getResources().getDisplayMetrics().density;
 
         mDebugTextPaint = new TextPaint();
-        mDebugTextPaint.setTextSize(dip2px(15));
+        mDebugTextSize = dip2px(15);
+        mDebugTextPaint.setTextSize(mDebugTextSize);
         mDebugTextPaint.setColor(Color.WHITE);
 
-        mPeerTrackHeight = dip2px(18 * mScaleTextRatio);
-
         mDanmakuTracks = new ArrayList<>();
-        for (int i = 0; i < mDanmakuTrackCount; i++) {
-            mDanmakuTracks.add(new DanmakuTrack());
-        }
     }
 
     public void setShowDebugInfo(boolean showDebugInfo) {
@@ -115,7 +105,7 @@ public class DanmakuView extends View {
 
     public void setDanmakuSource(ArrayList<Danmaku> danmakuSource) {
         this.mDanmakus = danmakuSource;
-        mDanmakuState = DanmakuState.Prepared;
+        prepareDanmakuTrack();
     }
 
     public void start() {
@@ -176,6 +166,7 @@ public class DanmakuView extends View {
             track.haveCenterDanmaku = false;
             track.lastScrollDanmaku = null;
         }
+        mDanmakuTracks.clear();
         mScrapDanmakus.clear();
         mTimer = null;
         mTask = null;
@@ -221,30 +212,38 @@ public class DanmakuView extends View {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
         mScreenHeight = getMeasuredHeight();
         mScreenWidth = getMeasuredWidth();
-        int trackTotalHeight = 0;
-        int currentTrackCount = 0;
-        while (trackTotalHeight + mPeerTrackHeight < mScreenHeight && currentTrackCount < mDanmakuTrackCount) {
-            trackTotalHeight += mPeerTrackHeight;
-            currentTrackCount++;
-        }
-        mDanmakuTrackCount = currentTrackCount;
-        mTrackMargin = (mScreenHeight - trackTotalHeight) / (mDanmakuTrackCount * 2.0f);
-        float currentY = 0;
-        for (int i = 0; i < mDanmakuTracks.size(); i++) {
-            if (i < mDanmakuTrackCount) {
-                DanmakuTrack track = mDanmakuTracks.get(i);
-                currentY += mTrackMargin;
+    }
+
+    //准备弹幕轨道
+    private void prepareDanmakuTrack() {
+        if (mDanmakuState == DanmakuState.IDLE) {
+            mDanmakuState = DanmakuState.Prepared;
+            TextPaint measureTextPaint = new TextPaint();
+            measureTextPaint.setAntiAlias(true);
+            measureTextPaint.setFakeBoldText(true);
+            measureTextPaint.setTextSize(dip2px(MAX_TRACK_HEIGHT) * mScaleTextRatio);
+            TextPaint.FontMetrics fontMetrics = measureTextPaint.getFontMetrics();
+            mPeerTrackHeight = fontMetrics.bottom - fontMetrics.ascent;
+            float trackTotalHeight = 0;
+            int currentTrackCount = 0;
+            while (trackTotalHeight + mPeerTrackHeight < mScreenHeight && currentTrackCount < mMaxDanmakuTrackCount) {
+                trackTotalHeight += mPeerTrackHeight;
+                currentTrackCount++;
+            }
+            mTrackMargin = (mScreenHeight - trackTotalHeight) / (currentTrackCount * 2);
+            float currentY = mTrackMargin;
+            for (int i = 0; i < currentTrackCount; i++) {
+                DanmakuTrack track = new DanmakuTrack();
                 track.y = currentY;
-                currentY += (mPeerTrackHeight + mTrackMargin);
-            } else {
-                mDanmakuTracks.remove(i);
+                mDanmakuTracks.add(track);
+                currentY += (mPeerTrackHeight + 2 * mTrackMargin);
             }
         }
     }
 
     //添加一条弹幕数据
     public void addDanamku(Danmaku danmaku) {
-        if (mCuurentDanmakuCount >= mMaxDanmakuCount) {
+        if (mCurrentDanmakuCount >= mMaxDanmakuCount || mDanmakuState == DanmakuState.IDLE) {
             return;
         }
         if (danmaku.getType() == 1) { //滚动弹幕
@@ -274,13 +273,13 @@ public class DanmakuView extends View {
     }
 
     private void addCenterDanmaku(DanmakuWrapped danmakuWrapped, int trackIndex) {
-        mCuurentDanmakuCount++;
+        mCurrentDanmakuCount++;
         mDanmakuTracks.get(trackIndex).mWaitToAddDanamku = danmakuWrapped;
         mDanmakuTracks.get(trackIndex).haveCenterDanmaku = true;
     }
 
     private void addScrollDanmaku(DanmakuWrapped danmakuWrapped, int trackIndex) {
-        mCuurentDanmakuCount++;
+        mCurrentDanmakuCount++;
         mDanmakuTracks.get(trackIndex).mWaitToAddDanamku = danmakuWrapped;
         mDanmakuTracks.get(trackIndex).lastScrollDanmaku = danmakuWrapped;
     }
@@ -295,7 +294,7 @@ public class DanmakuView extends View {
                 track.mWaitToAddDanamku = null;
             }
             track.mDanmakus.clear();
-            mCuurentDanmakuCount = 0;
+            mCurrentDanmakuCount = 0;
         }
     }
 
@@ -381,7 +380,10 @@ public class DanmakuView extends View {
             mFrame = 0;
             mDebugStartTime = nowTime;
         }
-        canvas.drawText(String.format(Locale.getDefault(), "fps:%d count:%d scrapCount:%d time:%.1fs trackCount:%d newCount:%d", mFps, mCuurentDanmakuCount, mScrapDanmakus.size(), mCurrentTime / 1000f, mDanmakuTracks.size(), mNewCount), 10, mScreenHeight - mDebugTextPaint.getFontMetrics().bottom, mDebugTextPaint);
+        Paint.FontMetrics fontMetrics = mDebugTextPaint.getFontMetrics();
+        float textHeight = (float) Math.ceil(fontMetrics.descent - fontMetrics.ascent);
+        canvas.drawText(String.format(Locale.getDefault(), "fps:%d count:%d/%d/%d time:%.1fs", mFps, mCurrentDanmakuCount, mScrapDanmakus.size(), mNewCount, mCurrentTime / 1000f), 0, mScreenHeight - textHeight - fontMetrics.bottom, mDebugTextPaint);
+        canvas.drawText(String.format(Locale.getDefault(), "trackCount:%d/%d trackHeight:%.1f trackMargin:%.1f screenSize:%d/%d", mDanmakuTracks.size(), mMaxDanmakuTrackCount, mPeerTrackHeight, mTrackMargin, mScreenWidth, mScreenHeight), 0, mScreenHeight - fontMetrics.bottom, mDebugTextPaint);
     }
 
     private void refreshDanmakuView() {
@@ -401,7 +403,7 @@ public class DanmakuView extends View {
                 if (danmaku.x + danmaku.getWidth() < 0) {
                     iterator.remove();
                     mScrapDanmakus.add(danmaku);
-                    mCuurentDanmakuCount--;
+                    mCurrentDanmakuCount--;
                 } else {
                     danmaku.x -= danmaku.speed;
                 }
@@ -410,10 +412,24 @@ public class DanmakuView extends View {
                     iterator.remove();
                     mScrapDanmakus.add(danmaku);
                     track.haveCenterDanmaku = false;
-                    mCuurentDanmakuCount--;
+                    mCurrentDanmakuCount--;
                 }
             }
         }
+    }
+
+    /**
+     * 根据手机的分辨率从 dip(像素) 的单位 转成为 px
+     */
+    public int dip2px(float dpValue) {
+        return (int) (dpValue * mDensity + 0.5f);
+    }
+
+    private enum DanmakuState {
+        IDLE,
+        Prepared,
+        Playing,
+        Pause,
     }
 
     private class DanmakuTimerTask extends TimerTask {
@@ -441,6 +457,16 @@ public class DanmakuView extends View {
         }
     }
 
+    // <d p="23.826000213623,1,25,16777215,1422201084,0,057075e9,757076900">我从未见过如此厚颜无耻之猴</d>
+    // 0:时间(弹幕出现时间)
+    // 1:类型(1从右至左滚动弹幕|6从左至右滚动弹幕|5顶端固定弹幕|4底端固定弹幕|7高级弹幕|8脚本弹幕)
+    // 2:字号(弹幕大小 12非常小,16特小,18小,25中,36大,45很大,64特别大)
+    // 3:颜色
+    // 4:时间戳 ?
+    // 5:弹幕池id
+    // 6:用户hash
+    // 7:弹幕id
+
     //弹幕轨道类
     private class DanmakuTrack {
         LinkedList<DanmakuWrapped> mDanmakus;
@@ -456,16 +482,6 @@ public class DanmakuView extends View {
         }
     }
 
-    // <d p="23.826000213623,1,25,16777215,1422201084,0,057075e9,757076900">我从未见过如此厚颜无耻之猴</d>
-    // 0:时间(弹幕出现时间)
-    // 1:类型(1从右至左滚动弹幕|6从左至右滚动弹幕|5顶端固定弹幕|4底端固定弹幕|7高级弹幕|8脚本弹幕)
-    // 2:字号(弹幕大小 12非常小,16特小,18小,25中,36大,45很大,64特别大)
-    // 3:颜色
-    // 4:时间戳 ?
-    // 5:弹幕池id
-    // 6:用户hash
-    // 7:弹幕id
-
     private class DanmakuWrapped {
 
         private Danmaku danmaku;
@@ -476,6 +492,10 @@ public class DanmakuView extends View {
 
         private TextPaint paint; //文本画笔
         private TextPaint strokePaint; //描边画笔
+
+        private float textHeight;
+        private float textWidth;
+        private float baseLineOffset;
 
         private DanmakuWrapped() {
             paint = new TextPaint();
@@ -497,34 +517,33 @@ public class DanmakuView extends View {
             } else {
                 strokePaint.setColor(Color.WHITE);
             }
-            strokePaint.setTextSize(dip2px(danmaku.getTextSize()) * mScaleTextRatio);
             paint.setColor(danmaku.getTextColor());
-            paint.setTextSize(dip2px(danmaku.getTextSize()) * mScaleTextRatio);
+            float textSize = dip2px(danmaku.getTextSize()) * mScaleTextRatio;
+            textSize = textSize > mPeerTrackHeight ? mPeerTrackHeight : textSize;
+            paint.setTextSize(textSize);
+            strokePaint.setTextSize(textSize);
+            TextPaint.FontMetrics fontMetrics = paint.getFontMetrics();
+            textHeight = fontMetrics.descent - fontMetrics.ascent;
+            textWidth = paint.measureText(danmaku.getContent());
+            baseLineOffset = -fontMetrics.ascent;
             speed = mSpeedRatio * (mScreenWidth + getWidth()) * 16.7f / mScrollDanmakuShowTime;
         }
 
         private void draw(Canvas canvas, float y) {
-            canvas.drawText(danmaku.getContent(), x, y + getHeight(), paint);
-            canvas.drawText(danmaku.getContent(), x, y + getHeight(), strokePaint);
+            canvas.drawText(danmaku.getContent(), x, y + baseLineOffset, paint);
+            canvas.drawText(danmaku.getContent(), x, y + baseLineOffset, strokePaint);
         }
 
-        private int getWidth() {
-            return (int) paint.measureText(danmaku.getContent());
+        private float getWidth() {
+            return textWidth;
         }
 
-        private int getHeight() {
-            return dip2px(danmaku.getTextSize());
+        private float getHeight() {
+            return textHeight;
         }
 
         private int getType() {
             return danmaku.getType();
         }
-    }
-
-    /**
-     * 根据手机的分辨率从 dip(像素) 的单位 转成为 px
-     */
-    public int dip2px(float dpValue) {
-        return (int) (dpValue * mDensity + 0.5f);
     }
 }
