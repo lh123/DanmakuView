@@ -227,30 +227,49 @@ public class DanmakuView extends View {
         mScreenWidth = getMeasuredWidth();
     }
 
+    @Override
+    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+        super.onSizeChanged(w, h, oldw, oldh);
+        mScreenWidth = w;
+        mScreenHeight = h;
+        int preState = mDanmakuState;
+        pause();
+        clearAllDanamku();
+        measureTrack();
+        if (preState == PLAYING) {
+            resume();
+        }
+    }
+
+    private void measureTrack() {
+        mDanmakuTracks.clear();
+        TextPaint measureTextPaint = new TextPaint();
+        measureTextPaint.setAntiAlias(true);
+        measureTextPaint.setFakeBoldText(true);
+        measureTextPaint.setTextSize(dip2px(MAX_TEXT_SIZE) * mScaleTextRatio);
+        TextPaint.FontMetrics fontMetrics = measureTextPaint.getFontMetrics();
+        mPeerTrackHeight = fontMetrics.bottom - fontMetrics.top;
+        float trackTotalHeight = 0;
+        int currentTrackCount = 0;
+        while (trackTotalHeight + mPeerTrackHeight < mScreenHeight && currentTrackCount < mMaxDanmakuTrackCount) {
+            trackTotalHeight += mPeerTrackHeight;
+            currentTrackCount++;
+        }
+        mTrackMargin = (mScreenHeight - trackTotalHeight) / (currentTrackCount * 2);
+        float currentY = mTrackMargin;
+        for (int i = 0; i < currentTrackCount; i++) {
+            DanmakuTrack track = new DanmakuTrack();
+            track.y = currentY;
+            mDanmakuTracks.add(track);
+            currentY += (mPeerTrackHeight + 2 * mTrackMargin);
+        }
+    }
+
     //准备弹幕轨道
     private void prepareDanmakuTrack() {
         if (mDanmakuState == IDLE) {
             mDanmakuState = PREPARED;
-            TextPaint measureTextPaint = new TextPaint();
-            measureTextPaint.setAntiAlias(true);
-            measureTextPaint.setFakeBoldText(true);
-            measureTextPaint.setTextSize(dip2px(MAX_TEXT_SIZE) * mScaleTextRatio);
-            TextPaint.FontMetrics fontMetrics = measureTextPaint.getFontMetrics();
-            mPeerTrackHeight = fontMetrics.bottom - fontMetrics.top;
-            float trackTotalHeight = 0;
-            int currentTrackCount = 0;
-            while (trackTotalHeight + mPeerTrackHeight < mScreenHeight && currentTrackCount < mMaxDanmakuTrackCount) {
-                trackTotalHeight += mPeerTrackHeight;
-                currentTrackCount++;
-            }
-            mTrackMargin = (mScreenHeight - trackTotalHeight) / (currentTrackCount * 2);
-            float currentY = mTrackMargin;
-            for (int i = 0; i < currentTrackCount; i++) {
-                DanmakuTrack track = new DanmakuTrack();
-                track.y = currentY;
-                mDanmakuTracks.add(track);
-                currentY += (mPeerTrackHeight + 2 * mTrackMargin);
-            }
+            measureTrack();
         }
     }
 
@@ -490,6 +509,7 @@ public class DanmakuView extends View {
             return lastDanmaku;
         }
 
+        @SuppressWarnings("RedundantIfStatement")
         private boolean canAddScrollDanmaku() {
             DanmakuWrapped lastScrollDanmaku = findLastScrollDanmaku();
             if (lastScrollDanmaku == null || lastScrollDanmaku.isDisAppear()) {
@@ -504,6 +524,7 @@ public class DanmakuView extends View {
         }
 
 
+        @SuppressWarnings("RedundantIfStatement")
         private boolean canAddScrollDanmakuAvoidOverLapping(DanmakuWrapped addDanmaku) {
             DanmakuWrapped lastScrollDanmaku = findLastScrollDanmaku();
             if (lastScrollDanmaku == null || lastScrollDanmaku.isDisAppear()) {
