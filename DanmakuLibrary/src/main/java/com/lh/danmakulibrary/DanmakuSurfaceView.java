@@ -259,7 +259,6 @@ public class DanmakuSurfaceView extends SurfaceView implements SurfaceHolder.Cal
     }
 
     private void releaseSource(boolean clearTrack) {
-        System.out.println("release:" + clearTrack);
         mNeedStop = false;
         mDrawThread = null;
         if (mTimer != null) {
