@@ -54,6 +54,9 @@ public class DanmakuSurfaceView extends SurfaceView implements SurfaceHolder.Cal
 
     private boolean mShowDanmaku; //是否显示弹幕
 
+    private boolean mNeedRelease;
+    private boolean mNeedStop;
+
     private TextPaint mDebugTextPaint;
     private int mDebugTextSize;
     private int mFps;
@@ -125,6 +128,8 @@ public class DanmakuSurfaceView extends SurfaceView implements SurfaceHolder.Cal
     private void init() {
         mShowDebugInfo = false;
         mAvoidOverLapping = true;
+        mNeedRelease = false;
+        mNeedStop = false;
 
         mShowDanmaku = true;
         mDanmakuState = IDLE;
@@ -166,7 +171,6 @@ public class DanmakuSurfaceView extends SurfaceView implements SurfaceHolder.Cal
     public void pause() {
         if (mDanmakuState == PLAYING && mTimer != null && mTask != null) {
             mDanmakuState = PAUSE;
-            mDrawThread = null;
             mTimer.cancel();
             mTask.cancel();
             mStartTime = -1;
@@ -206,46 +210,18 @@ public class DanmakuSurfaceView extends SurfaceView implements SurfaceHolder.Cal
 
     public void stop() {
         mDanmakuState = PREPARED;
-        mDrawThread = null;
-        if (mTimer != null) {
-            mTimer.cancel();
+        mNeedStop = true;
+        if (mDrawThread != null && !mDrawThread.isAlive()) {
+            releaseSource(false);
         }
-        if (mTask != null) {
-            mTask.cancel();
-        }
-        for (DanmakuTrack track : mDanmakuTracks) {
-            track.clear();
-        }
-        mScrapDanmakus.clear();
-        mTimer = null;
-        mTask = null;
-        mCurrentTime = -1;
-        mStartTime = -1;
-        mNewCount = 0;
-        mCurrentDanmakuCount = 0;
-        mLastAddDanmakuIndex = 0;
     }
 
     public void release() {
         mDanmakuState = IDLE;
-        mDrawThread = null;
-        if (mTimer != null) {
-            mTimer.cancel();
+        mNeedRelease = true;
+        if (mDrawThread != null && !mDrawThread.isAlive()) {
+            releaseSource(true);
         }
-        if (mTask != null) {
-            mTask.cancel();
-        }
-        for (DanmakuTrack track : mDanmakuTracks) {
-            track.clear();
-        }
-        mScrapDanmakus.clear();
-        mTimer = null;
-        mTask = null;
-        mCurrentTime = -1;
-        mStartTime = -1;
-        mNewCount = 0;
-        mCurrentDanmakuCount = 0;
-        mLastAddDanmakuIndex = 0;
     }
 
     public void show() {
@@ -280,6 +256,33 @@ public class DanmakuSurfaceView extends SurfaceView implements SurfaceHolder.Cal
 
     public long getCurrentTime() {
         return mCurrentTime;
+    }
+
+    private void releaseSource(boolean clearTrack) {
+        System.out.println("release:" + clearTrack);
+        mNeedStop = false;
+        mDrawThread = null;
+        if (mTimer != null) {
+            mTimer.cancel();
+        }
+        if (mTask != null) {
+            mTask.cancel();
+        }
+        for (DanmakuTrack track : mDanmakuTracks) {
+            track.clear();
+        }
+        mScrapDanmakus.clear();
+        mTimer = null;
+        mTask = null;
+        mCurrentTime = -1;
+        mStartTime = -1;
+        mNewCount = 0;
+        mCurrentDanmakuCount = 0;
+        mLastAddDanmakuIndex = 0;
+        if (clearTrack) {
+            mNeedRelease = false;
+            mDanmakuTracks.clear();
+        }
     }
 
     private void measureTrack() {
@@ -492,6 +495,9 @@ public class DanmakuSurfaceView extends SurfaceView implements SurfaceHolder.Cal
                     e.printStackTrace();
                 }
             }
+            if (mNeedRelease || mNeedStop) {
+                releaseSource(mNeedRelease);
+            }
         }
     }
 
@@ -647,24 +653,28 @@ public class DanmakuSurfaceView extends SurfaceView implements SurfaceHolder.Cal
         }
 
         private ListIterator<DanmakuWrapped> getFirstIterator() {
-            if (mDanmakusIterator != null) {
-                while (mDanmakusIterator.hasPrevious()) {
-                    mDanmakusIterator.previous();
+            synchronized (this) {
+                if (mDanmakusIterator != null) {
+                    while (mDanmakusIterator.hasPrevious()) {
+                        mDanmakusIterator.previous();
+                    }
+                } else {
+                    mDanmakusIterator = mDanmakus.listIterator();
                 }
-            } else {
-                mDanmakusIterator = mDanmakus.listIterator();
             }
             return mDanmakusIterator;
         }
 
         private ListIterator<DanmakuWrapped> getLastIterator() {
-            if (mDanmakusIterator != null) {
-                while (mDanmakusIterator.hasNext()) {
-                    mDanmakusIterator.next();
+            synchronized (this) {
+                if (mDanmakusIterator != null) {
+                    while (mDanmakusIterator.hasNext()) {
+                        mDanmakusIterator.next();
+                    }
+                } else {
+                    int size = mDanmakus.size();
+                    mDanmakusIterator = mDanmakus.listIterator(size > 0 ? size - 1 : 0);
                 }
-            } else {
-                int size = mDanmakus.size();
-                mDanmakusIterator = mDanmakus.listIterator(size > 0 ? size - 1 : 0);
             }
             return mDanmakusIterator;
         }
