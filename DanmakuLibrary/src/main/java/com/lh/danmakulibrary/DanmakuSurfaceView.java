@@ -462,6 +462,9 @@ public class DanmakuSurfaceView extends SurfaceView implements SurfaceHolder.Cal
             return;
         }
         Canvas canvas = mSurfaceHolder.lockCanvas();
+        if (canvas == null) {
+            return;
+        }
         canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
         for (int i = 0; i < mDanmakuTracks.size(); i++) {
             DanmakuTrack track = mDanmakuTracks.get(i);
