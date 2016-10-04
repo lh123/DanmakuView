@@ -4,9 +4,11 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.PorterDuff;
 import android.text.TextPaint;
 import android.util.AttributeSet;
-import android.view.View;
+import android.view.SurfaceHolder;
+import android.view.SurfaceView;
 
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -16,16 +18,16 @@ import java.util.Timer;
 import java.util.TimerTask;
 
 /**
- * Created by liuhui on 2016/9/8.
- * 弹幕控件
+ * Created by liuhui on 2016/10/4.
  */
-@SuppressWarnings({"FieldCanBeLocal", "unused"})
-public class DanmakuView extends View {
+
+public class DanmakuSurfaceView extends SurfaceView implements SurfaceHolder.Callback {
 
     public static final int IDLE = 0;
     public static final int PREPARED = 1;
     public static final int PLAYING = 2;
     public static final int PAUSE = 3;
+    public static final int SEEKING = 4;
 
     private static final long REFRESH_TIME = 100;
     private static final int MAX_TEXT_SIZE = 21;
@@ -60,6 +62,7 @@ public class DanmakuView extends View {
 
     private Timer mTimer;
     private DanmakuTimerTask mTask;
+    private DrawThread mDrawThread;
 
     private ArrayList<Danmaku> mDanmakus; //弹幕数据源
 
@@ -73,20 +76,50 @@ public class DanmakuView extends View {
 
     private int mLastAddDanmakuIndex; //最后出现的弹幕的索引
 
-    public DanmakuView(Context context) {
+    private SurfaceHolder mSurfaceHolder;
+
+    public DanmakuSurfaceView(Context context) {
         super(context);
         init();
     }
 
-
-    public DanmakuView(Context context, AttributeSet attrs) {
+    public DanmakuSurfaceView(Context context, AttributeSet attrs) {
         super(context, attrs);
         init();
     }
 
-    public DanmakuView(Context context, AttributeSet attrs, int defStyleAttr) {
+    public DanmakuSurfaceView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         init();
+    }
+
+    @Override
+    public void surfaceCreated(SurfaceHolder holder) {
+        mSurfaceHolder = holder;
+    }
+
+    @Override
+    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+        mScreenHeight = height;
+        mScreenWidth = width;
+        if (mDanmakuTracks.size() == 0) {
+            prepareDanmakuTrack();
+        } else {
+            System.out.println("change");
+            int preState = mDanmakuState;
+            pause();
+            clearAllDanamku();
+            measureTrack();
+            if (preState == PLAYING) {
+                resume();
+            }
+        }
+    }
+
+    @Override
+    public void surfaceDestroyed(SurfaceHolder holder) {
+        System.out.println("surfaceDestroyed");
+        mSurfaceHolder = null;
     }
 
     //初始化
@@ -105,6 +138,7 @@ public class DanmakuView extends View {
 
         mDanmakuTracks = new ArrayList<>();
         mScrapDanmakus = new LinkedList<>();
+        getHolder().addCallback(this);
     }
 
     public void setShowDebugInfo(boolean showDebugInfo) {
@@ -117,22 +151,23 @@ public class DanmakuView extends View {
 
     public void setDanmakuSource(ArrayList<Danmaku> danmakuSource) {
         this.mDanmakus = danmakuSource;
-        prepareDanmakuTrack();
     }
 
     public void start() {
         if (mDanmakuState == PREPARED) {
             mDanmakuState = PLAYING;
+            mDrawThread = new DrawThread();
             mTimer = new Timer();
             mTask = new DanmakuTimerTask();
+            mDrawThread.start();
             mTimer.scheduleAtFixedRate(mTask, 0, REFRESH_TIME);
-            postInvalidate();
         }
     }
 
     public void pause() {
         if (mDanmakuState == PLAYING && mTimer != null && mTask != null) {
             mDanmakuState = PAUSE;
+            mDrawThread = null;
             mTimer.cancel();
             mTask.cancel();
             mStartTime = -1;
@@ -144,17 +179,19 @@ public class DanmakuView extends View {
     public void resume() {
         if (mDanmakuState == PAUSE) {
             mDanmakuState = PLAYING;
+            mDrawThread = new DrawThread();
             mTimer = new Timer();
             mTask = new DanmakuTimerTask();
+            mDrawThread.start();
             mTimer.scheduleAtFixedRate(mTask, 0, REFRESH_TIME);
-            postInvalidate();
+
         }
     }
 
     public void seekTo(long time) {
         if (mDanmakuState != IDLE) {
             int preState = mDanmakuState;
-            mDanmakuState = PAUSE;
+            mDanmakuState = SEEKING;
             mCurrentTime = time;
             for (int i = 0; i < mDanmakus.size(); i++) {
                 Danmaku danmaku = mDanmakus.get(i);
@@ -165,12 +202,12 @@ public class DanmakuView extends View {
             }
             clearAllDanamku();
             mDanmakuState = preState;
-            postInvalidate();
         }
     }
 
     public void stop() {
         mDanmakuState = PREPARED;
+        mDrawThread = null;
         if (mTimer != null) {
             mTimer.cancel();
         }
@@ -186,20 +223,20 @@ public class DanmakuView extends View {
         mCurrentTime = -1;
         mStartTime = -1;
         mNewCount = 0;
+        mCurrentDanmakuCount = 0;
         mLastAddDanmakuIndex = 0;
-        postInvalidate();
     }
 
     public void release() {
         stop();
         mDanmakuState = IDLE;
         mDanmakuTracks.clear();
+        System.out.println("release_finish");
     }
 
     public void show() {
         if (!mShowDanmaku) {
             mShowDanmaku = true;
-            postInvalidate();
         }
     }
 
@@ -226,28 +263,8 @@ public class DanmakuView extends View {
         return mCurrentTime;
     }
 
-    @Override
-    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-        mScreenHeight = getMeasuredHeight();
-        mScreenWidth = getMeasuredWidth();
-    }
-
-    @Override
-    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
-        super.onSizeChanged(w, h, oldw, oldh);
-        mScreenWidth = w;
-        mScreenHeight = h;
-        int preState = mDanmakuState;
-        pause();
-        clearAllDanamku();
-        measureTrack();
-        if (preState == PLAYING) {
-            resume();
-        }
-    }
-
     private void measureTrack() {
+        System.out.println("measure_start");
         mDanmakuTracks.clear();
         TextPaint measureTextPaint = new TextPaint();
         measureTextPaint.setAntiAlias(true);
@@ -269,6 +286,7 @@ public class DanmakuView extends View {
             mDanmakuTracks.add(track);
             currentY += (mPeerTrackHeight + 2 * mTrackMargin);
         }
+        System.out.println("measure_end");
     }
 
     //准备弹幕轨道
@@ -400,23 +418,6 @@ public class DanmakuView extends View {
         return -1;
     }
 
-    @Override
-    protected void onDraw(Canvas canvas) {
-        super.onDraw(canvas);
-        for (int i = 0; i < mDanmakuTracks.size(); i++) {
-            DanmakuTrack track = mDanmakuTracks.get(i);
-            if (mShowDanmaku) {
-                track.draw(canvas);
-            }
-        }
-        if (mShowDebugInfo) {
-            drawDebugInfo(canvas);
-        }
-        if (mDanmakuState == PLAYING) {
-            postInvalidate();
-        }
-    }
-
     private void drawDebugInfo(Canvas canvas) {
         mFrame++;
         final long nowTime = System.currentTimeMillis();
@@ -437,6 +438,41 @@ public class DanmakuView extends View {
      */
     public int dip2px(float dpValue) {
         return (int) (dpValue * mDensity + 0.5f);
+    }
+
+    private void doDraw() {
+        if (mSurfaceHolder == null || mDanmakuState == PAUSE || mDanmakuState == SEEKING) {
+            return;
+        }
+        Canvas canvas = mSurfaceHolder.lockCanvas();
+        canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
+        for (int i = 0; i < mDanmakuTracks.size(); i++) {
+            DanmakuTrack track = mDanmakuTracks.get(i);
+            if (mShowDanmaku) {
+                track.draw(canvas);
+            }
+        }
+        if (mShowDebugInfo) {
+            drawDebugInfo(canvas);
+        }
+        if (mSurfaceHolder != null) {
+            mSurfaceHolder.unlockCanvasAndPost(canvas);
+        }
+    }
+
+    private class DrawThread extends Thread {
+        @Override
+        public void run() {
+            while (mDanmakuState == PLAYING || mDanmakuState == SEEKING) {
+                long preTime = System.currentTimeMillis();
+                doDraw();
+                try {
+                    Thread.sleep(Math.max(16 + preTime - System.currentTimeMillis(), 0));
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
     }
 
     private class DanmakuTimerTask extends TimerTask {
@@ -468,15 +504,15 @@ public class DanmakuView extends View {
         }
     }
 
-    // <d p="23.826000213623,1,25,16777215,1422201084,0,057075e9,757076900">我从未见过如此厚颜无耻之猴</d>
-    // 0:时间(弹幕出现时间)
-    // 1:类型(1从右至左滚动弹幕|6从左至右滚动弹幕|5顶端固定弹幕|4底端固定弹幕|7高级弹幕|8脚本弹幕)
-    // 2:字号(弹幕大小 12非常小,16特小,18小,25中,36大,45很大,64特别大)
-    // 3:颜色
-    // 4:时间戳 ?
-    // 5:弹幕池id
-    // 6:用户hash
-    // 7:弹幕id
+// <d p="23.826000213623,1,25,16777215,1422201084,0,057075e9,757076900">我从未见过如此厚颜无耻之猴</d>
+// 0:时间(弹幕出现时间)
+// 1:类型(1从右至左滚动弹幕|6从左至右滚动弹幕|5顶端固定弹幕|4底端固定弹幕|7高级弹幕|8脚本弹幕)
+// 2:字号(弹幕大小 12非常小,16特小,18小,25中,36大,45很大,64特别大)
+// 3:颜色
+// 4:时间戳 ?
+// 5:弹幕池id
+// 6:用户hash
+// 7:弹幕id
 
     //弹幕轨道类
     private class DanmakuTrack {
@@ -709,4 +745,5 @@ public class DanmakuView extends View {
             }
         }
     }
+
 }

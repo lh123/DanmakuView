@@ -8,6 +8,7 @@ import android.widget.SeekBar;
 
 import com.lh.danmakulibrary.BiliBiliDanmakuParser;
 import com.lh.danmakulibrary.Danmaku;
+import com.lh.danmakulibrary.DanmakuSurfaceView;
 import com.lh.danmakulibrary.DanmakuView;
 
 import java.util.ArrayList;
@@ -21,6 +22,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        System.out.println("onCreat_ac");
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         danmakuView = (DanmakuView) findViewById(R.id.danmak_view);
@@ -35,7 +37,7 @@ public class MainActivity extends AppCompatActivity {
         } catch (Exception e) {
             e.printStackTrace();
         }
-//        danmakuView.setShowDebugInfo(true);
+        danmakuView.setShowDebugInfo(true);
         danmakuView.post(new Runnable() {
             @Override
             public void run() {
@@ -45,9 +47,9 @@ public class MainActivity extends AppCompatActivity {
         danmakuView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if(danmakuView.isShow()){
+                if (danmakuView.isShow()) {
                     danmakuView.hide();
-                }else {
+                } else {
                     danmakuView.show();
                 }
             }
@@ -93,6 +95,7 @@ public class MainActivity extends AppCompatActivity {
                 danmakuView.seekTo(seekBar.getProgress());
             }
         });
+        System.out.println("Creat_ac_finish");
     }
 
     @Override
@@ -113,9 +116,11 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
-        super.onDestroy();
         if (danmakuView.isPrepared()) {
-            danmakuView.stop();
+            System.out.println("destory_ac");
+            danmakuView.release();
         }
+        super.onDestroy();
+
     }
 }
