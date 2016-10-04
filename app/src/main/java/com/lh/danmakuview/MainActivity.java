@@ -16,7 +16,7 @@ import java.util.ArrayList;
 public class MainActivity extends AppCompatActivity {
 
     private ArrayList<Danmaku> ds;
-    private DanmakuView danmakuView;
+    private DanmakuSurfaceView danmakuView;
     private Button btnPlay, btnPause, btnResume, btnStop;
     private SeekBar seekBar;
 
@@ -25,7 +25,7 @@ public class MainActivity extends AppCompatActivity {
         System.out.println("onCreat_ac");
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        danmakuView = (DanmakuView) findViewById(R.id.danmak_view);
+        danmakuView = (DanmakuSurfaceView) findViewById(R.id.danmak_view);
         btnPlay = (Button) findViewById(R.id.play);
         btnPause = (Button) findViewById(R.id.pause);
         btnResume = (Button) findViewById(R.id.resume);
@@ -116,11 +116,9 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        super.onDestroy();
         if (danmakuView.isPrepared()) {
-            System.out.println("destory_ac");
             danmakuView.release();
         }
-        super.onDestroy();
-
     }
 }

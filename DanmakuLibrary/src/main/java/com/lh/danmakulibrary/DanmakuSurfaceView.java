@@ -4,6 +4,7 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.PixelFormat;
 import android.graphics.PorterDuff;
 import android.text.TextPaint;
 import android.util.AttributeSet;
@@ -105,7 +106,6 @@ public class DanmakuSurfaceView extends SurfaceView implements SurfaceHolder.Cal
         if (mDanmakuTracks.size() == 0) {
             prepareDanmakuTrack();
         } else {
-            System.out.println("change");
             int preState = mDanmakuState;
             pause();
             clearAllDanamku();
@@ -118,7 +118,6 @@ public class DanmakuSurfaceView extends SurfaceView implements SurfaceHolder.Cal
 
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
-        System.out.println("surfaceDestroyed");
         mSurfaceHolder = null;
     }
 
@@ -228,10 +227,25 @@ public class DanmakuSurfaceView extends SurfaceView implements SurfaceHolder.Cal
     }
 
     public void release() {
-        stop();
         mDanmakuState = IDLE;
-        mDanmakuTracks.clear();
-        System.out.println("release_finish");
+        mDrawThread = null;
+        if (mTimer != null) {
+            mTimer.cancel();
+        }
+        if (mTask != null) {
+            mTask.cancel();
+        }
+        for (DanmakuTrack track : mDanmakuTracks) {
+            track.clear();
+        }
+        mScrapDanmakus.clear();
+        mTimer = null;
+        mTask = null;
+        mCurrentTime = -1;
+        mStartTime = -1;
+        mNewCount = 0;
+        mCurrentDanmakuCount = 0;
+        mLastAddDanmakuIndex = 0;
     }
 
     public void show() {
@@ -245,6 +259,11 @@ public class DanmakuSurfaceView extends SurfaceView implements SurfaceHolder.Cal
             mShowDanmaku = false;
             postInvalidate();
         }
+    }
+
+    public void setTransParent() {
+        setZOrderOnTop(true);
+        getHolder().setFormat(PixelFormat.TRANSPARENT);
     }
 
     public boolean isShow() {
@@ -264,7 +283,6 @@ public class DanmakuSurfaceView extends SurfaceView implements SurfaceHolder.Cal
     }
 
     private void measureTrack() {
-        System.out.println("measure_start");
         mDanmakuTracks.clear();
         TextPaint measureTextPaint = new TextPaint();
         measureTextPaint.setAntiAlias(true);
@@ -286,7 +304,6 @@ public class DanmakuSurfaceView extends SurfaceView implements SurfaceHolder.Cal
             mDanmakuTracks.add(track);
             currentY += (mPeerTrackHeight + 2 * mTrackMargin);
         }
-        System.out.println("measure_end");
     }
 
     //准备弹幕轨道
@@ -441,7 +458,7 @@ public class DanmakuSurfaceView extends SurfaceView implements SurfaceHolder.Cal
     }
 
     private void doDraw() {
-        if (mSurfaceHolder == null || mDanmakuState == PAUSE || mDanmakuState == SEEKING) {
+        if (mSurfaceHolder == null || mDanmakuState != PLAYING) {
             return;
         }
         Canvas canvas = mSurfaceHolder.lockCanvas();
