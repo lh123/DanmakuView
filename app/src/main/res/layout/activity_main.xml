@@ -7,7 +7,7 @@
     android:background="#58000000"
     tools:context="com.lh.danmakuview.MainActivity">
 
-    <com.lh.danmakulibrary.DanmakuSurfaceView
+    <com.lh.danmakulibrary.DanmakuView
         android:id="@+id/danmak_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"/>

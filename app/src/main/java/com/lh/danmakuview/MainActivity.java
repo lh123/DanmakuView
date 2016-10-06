@@ -8,7 +8,6 @@ import android.widget.SeekBar;
 
 import com.lh.danmakulibrary.BiliBiliDanmakuParser;
 import com.lh.danmakulibrary.Danmaku;
-import com.lh.danmakulibrary.DanmakuSurfaceView;
 import com.lh.danmakulibrary.DanmakuView;
 
 import java.util.ArrayList;
@@ -16,7 +15,7 @@ import java.util.ArrayList;
 public class MainActivity extends AppCompatActivity {
 
     private ArrayList<Danmaku> ds;
-    private DanmakuSurfaceView danmakuView;
+    private DanmakuView danmakuView;
     private Button btnPlay, btnPause, btnResume, btnStop;
     private SeekBar seekBar;
 
@@ -25,7 +24,7 @@ public class MainActivity extends AppCompatActivity {
         System.out.println("onCreat_ac");
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        danmakuView = (DanmakuSurfaceView) findViewById(R.id.danmak_view);
+        danmakuView = (DanmakuView) findViewById(R.id.danmak_view);
         btnPlay = (Button) findViewById(R.id.play);
         btnPause = (Button) findViewById(R.id.pause);
         btnResume = (Button) findViewById(R.id.resume);

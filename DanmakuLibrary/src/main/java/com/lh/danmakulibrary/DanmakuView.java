@@ -327,7 +327,12 @@ public class DanmakuView extends View {
     private void clearAllDanamku() {
         for (int i = 0; i < mDanmakuTracks.size(); i++) {
             DanmakuTrack track = mDanmakuTracks.get(i);
-            mScrapDanmakus.addAll(track.mDanmakus);
+            ListIterator<DanmakuWrapped> iterator = track.mDanmakus.getHeadIterator();
+            while (iterator.hasNext()) {
+                DanmakuWrapped danmakuWrapped = iterator.next();
+                mScrapDanmakus.add(danmakuWrapped);
+                iterator.remove();
+            }
             track.haveCenterDanmaku = false;
             if (track.mWaitToAddCenterDanamku != null) {
                 mScrapDanmakus.add(track.mWaitToAddCenterDanamku);
@@ -480,17 +485,17 @@ public class DanmakuView extends View {
 
     //弹幕轨道类
     private class DanmakuTrack {
-        private LinkedList<DanmakuWrapped> mDanmakus;
+        private DanmakuList<DanmakuWrapped> mDanmakus;
         private DanmakuWrapped mWaitToAddCenterDanamku; //等待加入轨道的弹幕
         private DanmakuWrapped mWaitToAddScrollDanamku; //等待加入轨道的弹幕
-        private ListIterator<DanmakuWrapped> mDanmakusIterator;
+
+        private DanmakuWrapped lastScrollDanmaku;
         private float y;
 
         private boolean haveCenterDanmaku;
 
         private DanmakuTrack() {
-            mDanmakus = new LinkedList<>();
-            mDanmakusIterator = mDanmakus.listIterator();
+            mDanmakus = new DanmakuList<>();
             haveCenterDanmaku = false;
         }
 
@@ -498,26 +503,8 @@ public class DanmakuView extends View {
             return !haveCenterDanmaku && mWaitToAddCenterDanamku == null;
         }
 
-        private DanmakuWrapped findLastScrollDanmaku() {
-            DanmakuWrapped lastDanmaku = null;
-            if (mWaitToAddScrollDanamku != null) {
-                lastDanmaku = mWaitToAddScrollDanamku;
-            } else {
-                ListIterator<DanmakuWrapped> listIterator = getLastIterator();
-                while (listIterator.hasPrevious()) {
-                    DanmakuWrapped pre = listIterator.previous();
-                    if (pre.getType() == 1) {
-                        lastDanmaku = pre;
-                        break;
-                    }
-                }
-            }
-            return lastDanmaku;
-        }
-
         @SuppressWarnings("RedundantIfStatement")
         private boolean canAddScrollDanmaku() {
-            DanmakuWrapped lastScrollDanmaku = findLastScrollDanmaku();
             if (lastScrollDanmaku == null || lastScrollDanmaku.isDisAppear()) {
                 return true;
             } else {
@@ -532,7 +519,6 @@ public class DanmakuView extends View {
 
         @SuppressWarnings("RedundantIfStatement")
         private boolean canAddScrollDanmakuAvoidOverLapping(DanmakuWrapped addDanmaku) {
-            DanmakuWrapped lastScrollDanmaku = findLastScrollDanmaku();
             if (lastScrollDanmaku == null || lastScrollDanmaku.isDisAppear()) {
                 return true;
             } else {
@@ -550,6 +536,7 @@ public class DanmakuView extends View {
 
         private void addScrollDanmaku(DanmakuWrapped danmakuWrapped) {
             mWaitToAddScrollDanamku = danmakuWrapped;
+            lastScrollDanmaku = mWaitToAddScrollDanamku;
         }
 
         private void addCenterDanmaku(DanmakuWrapped danmakuWrapped) {
@@ -558,23 +545,27 @@ public class DanmakuView extends View {
         }
 
 
+        private void addToLast(DanmakuWrapped t) {
+            mDanmakus.addToLast(t);
+        }
+
         private void draw(Canvas canvas) {
             if (mWaitToAddCenterDanamku != null) {
-                getLastIterator().add(mWaitToAddCenterDanamku);
+                addToLast(mWaitToAddCenterDanamku);
                 mWaitToAddCenterDanamku = null;
             }
             if (mWaitToAddScrollDanamku != null) {
-                getLastIterator().add(mWaitToAddScrollDanamku);
+                addToLast(mWaitToAddScrollDanamku);
                 mWaitToAddScrollDanamku = null;
             }
-            ListIterator<DanmakuWrapped> listIterator = getFirstIterator();
-            while (listIterator.hasNext()) {
-                DanmakuWrapped danmaku = listIterator.next();
+            ListIterator<DanmakuWrapped> iterator = mDanmakus.getHeadIterator();
+            while (iterator.hasNext()) {
+                DanmakuWrapped danmaku = iterator.next();
                 danmaku.draw(canvas, y);
                 if (danmaku.danmaku.getType() == 1) {
                     if (danmaku.isDisAppear()) {
                         mScrapDanmakus.add(danmaku);
-                        listIterator.remove();
+                        iterator.remove();
                         mCurrentDanmakuCount--;
                     } else {
                         danmaku.x -= danmaku.speed;
@@ -582,7 +573,7 @@ public class DanmakuView extends View {
                 } else if (danmaku.getType() == 4 || danmaku.getType() == 5) {
                     if (System.currentTimeMillis() - danmaku.showTime > mCenterDanmakuShowTime) {
                         mScrapDanmakus.add(danmaku);
-                        listIterator.remove();
+                        iterator.remove();
                         haveCenterDanmaku = false;
                         mCurrentDanmakuCount--;
                     }
@@ -590,38 +581,21 @@ public class DanmakuView extends View {
             }
         }
 
-        private ListIterator<DanmakuWrapped> getFirstIterator() {
-            if (mDanmakusIterator != null) {
-                while (mDanmakusIterator.hasPrevious()) {
-                    mDanmakusIterator.previous();
-                }
-            } else {
-                mDanmakusIterator = mDanmakus.listIterator();
-            }
-            return mDanmakusIterator;
-        }
-
-        private ListIterator<DanmakuWrapped> getLastIterator() {
-            if (mDanmakusIterator != null) {
-                while (mDanmakusIterator.hasNext()) {
-                    mDanmakusIterator.next();
-                }
-            } else {
-                int size = mDanmakus.size();
-                mDanmakusIterator = mDanmakus.listIterator(size > 0 ? size - 1 : 0);
-            }
-            return mDanmakusIterator;
-        }
-
         private void clear() {
-            ListIterator<DanmakuWrapped> iterator = getFirstIterator();
-            while (iterator.hasNext()) {
-                iterator.next();
-                iterator.remove();
-            }
             mWaitToAddCenterDanamku = null;
             mWaitToAddScrollDanamku = null;
+            mDanmakus.clear();
             haveCenterDanmaku = false;
+        }
+
+        private class Node {
+            private DanmakuWrapped t;
+            private Node pre;
+            private Node next;
+
+            Node(DanmakuWrapped t) {
+                this.t = t;
+            }
         }
     }
 
