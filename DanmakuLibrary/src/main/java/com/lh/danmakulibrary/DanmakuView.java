@@ -411,9 +411,7 @@ public class DanmakuView extends View {
         super.onDraw(canvas);
         for (int i = 0; i < mDanmakuTracks.size(); i++) {
             DanmakuTrack track = mDanmakuTracks.get(i);
-            if (mShowDanmaku) {
-                track.draw(canvas);
-            }
+            track.draw(canvas);
         }
         if (mShowDebugInfo) {
             drawDebugInfo(canvas);
@@ -581,7 +579,9 @@ public class DanmakuView extends View {
             ListIterator<DanmakuWrapped> iterator = mDanmakus.getHeadIterator();
             while (iterator.hasNext()) {
                 DanmakuWrapped danmaku = iterator.next();
-                danmaku.draw(canvas, y);
+                if (mShowDanmaku) {
+                    danmaku.draw(canvas, y);
+                }
                 if (danmaku.danmaku.getType() == 1) {
                     if (danmaku.isDisAppear()) {
                         mScrapDanmakus.add(danmaku);
