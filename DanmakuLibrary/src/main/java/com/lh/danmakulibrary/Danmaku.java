@@ -1,5 +1,6 @@
 package com.lh.danmakulibrary;
 
+import android.graphics.Color;
 import android.support.annotation.NonNull;
 
 /**
@@ -59,7 +60,13 @@ public class Danmaku implements Comparable<Danmaku> {
         danmaku.setTime((long) (Float.parseFloat(strs[0]) * 1000L));
         danmaku.setType(Integer.parseInt(strs[1]));
         danmaku.setTextSize(Integer.parseInt(strs[2]));
-        danmaku.setTextColor(Integer.parseInt(strs[3]) | 0xFF000000);
+        int color;
+        try {
+            color = Integer.parseInt(strs[3]) | 0xFF000000;
+        } catch (NumberFormatException e){
+            color = Color.WHITE;
+        }
+        danmaku.setTextColor(color);
         return danmaku;
     }
 
